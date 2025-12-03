@@ -1,0 +1,99 @@
+# Python related
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.dylib
+
+# Virtual environments
+.env/
+.env.*            # optional env files
+.venv/
+venv/
+ENV/
+env/
+mp_env/           # user's example virtualenv folder
+mp_env/**         # ignore virtualenv content recursively (if used locally)
+
+# Editor/IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and runtime files
+*.log
+logs/
+*.pid
+*.seed
+
+# Package / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.whl
+
+# Test / coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Caches
+.mypy_cache/
+.cache/
+__pycache__/
+*.cache
+
+# Jupyter
+.ipynb_checkpoints
+
+# Node (if any front-end components)
+node_modules/
+
+# Secrets / env files
+.env
+.env.local
+.env.*.local
+credentials.json
+
+# Data / outputs / generated files
+CSV_files/
+data/
+datasets/
+*.csv
+
+# Media/Model caches and large downloaded assets
+# Hugging Face / transformers / torch caches (user-level caches are typically in home dir, but ignore local caches too)
+.cache/huggingface/
+.cache/torch/
+.huggingface/
+models/
+model_weights/
+saved_models/
+weights/
+
+# OpenCV/Camera outputs (if used for debugging)
+*.mp4
+*.avi
+captures/
+
+# IDE project files
+.vscode/
+*.code-workspace
+
+# Platform-specific
+desktop.ini
+
+# Optional: lock files (if you want to track these, remove)
+Pipfile.lock
+poetry.lock
+
+# Allow a local override file (not committed)
+!.gitignore.local
