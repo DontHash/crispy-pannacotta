@@ -67,6 +67,9 @@ credentials.json
 CSV_files/
 data/
 datasets/
+mp_env/
+_pycache_/
+__pycache__/
 *.csv
 
 # Media/Model caches and large downloaded assets
