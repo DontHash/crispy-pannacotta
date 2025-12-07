@@ -13,6 +13,14 @@ from ui import HomeScreen
 
 pygame.init()
 
+pygame.mixer.init()
+try:
+    pygame.mixer.music.load("./Assets/BG_Music1.mp3")  
+    pygame.mixer.music.set_volume(0.35)                        
+    pygame.mixer.music.play(-1)                               
+except:
+    print("[Warning] Could not load background music.")
+
 WIDTH, HEIGHT = 800, 600
 FPS = 30
 
@@ -27,7 +35,7 @@ def main():
     clock = pygame.time.Clock()
 
     # Initialize modules
-    bg = Background(screen, grid_size=24)
+    bg = Background(screen,"./Assets/Disco_background1.jpg")
     player = Player()
     snake = Snake(start_pos=(WIDTH//2, HEIGHT//2))
     controller = InputController(initial="RIGHT")
@@ -154,29 +162,29 @@ def main():
             "RIGHT": (1, 0),
         }[dir_string])
 
-        # update snake physics
+       
         snake.update(dt=1.0)
 
-        # check boundary collision
+        
         hx, hy = snake.body_points[0]
         if hx < 0 or hy < 0 or hx > WIDTH or hy > HEIGHT:
             game_over = True
             snake.alive = False
 
-        # check self collision
+        
         if snake.collides_self():
             game_over = True
             snake.alive = False
 
-        # check food collision
+        
         if snake.collides_with_point(food, radius=14):
             player.add_score(1)
             snake.grow(50)  # grow by some pixels
             food = spawn_food()
 
-        # draw
+        
         bg.draw()
-        # food
+        
         pygame.draw.circle(screen, (255, 50, 50), (int(food[0]), int(food[1])), food_radius)
         snake.draw(screen)
 
