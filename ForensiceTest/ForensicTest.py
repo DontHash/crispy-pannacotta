@@ -20,11 +20,11 @@ SUPPORTED_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".avif"]
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-# UNIVERSAL IMAGE LOADER
+
 
 def load_image_gray(path):
     try:
-        img = Image.open(path).convert("L")  # Grayscale
+        img = Image.open(path).convert("L") 
         return np.array(img)
     except Exception as e:
         print(f"[!] Failed to load {path}: {e}")
