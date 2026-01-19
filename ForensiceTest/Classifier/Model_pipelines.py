@@ -76,7 +76,7 @@ def collect_dataset(folder, label):
 
 
 if __name__ == "__main__":
-    print("\nPROJECT ALETHEIA MULTI MODEL TRAINING\n")
+    print("\nMULTI MODEL TRAINING\n")
 
     X_real, y_real = collect_dataset(REAL_DIR, 0)
     X_fake, y_fake = collect_dataset(FAKE_DIR, 1)
