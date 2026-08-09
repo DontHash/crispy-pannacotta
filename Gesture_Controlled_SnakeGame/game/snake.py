@@ -1,135 +1,177 @@
 # game/snake.py
-# Smooth slender glowing snake (constant width, grows only in length).
+# Classic grid snake with smooth interpolated rendering.
+# Movement is grid-cell based (exact collisions); rendering is continuous.
 
+import numpy as np
 import pygame
-import math
 
-def catmull_rom_chain(points, count=12):
-    if len(points) < 2:
-        return points[:]
-    pts = []
-    ext = [points[0]] + points + [points[-1]]
-    for i in range(len(ext)-3):
-        p0, p1, p2, p3 = ext[i], ext[i+1], ext[i+2], ext[i+3]
-        for t_step in range(count):
-            t = t_step / float(count)
-            t2 = t * t
-            t3 = t2 * t
-            x = 0.5 * ((2*p1[0]) +
-                       (-p0[0] + p2[0]) * t +
-                       (2*p0[0] - 5*p1[0] + 4*p2[0] - p3[0]) * t2 +
-                       (-p0[0] + 3*p1[0] - 3*p2[0] + p3[0]) * t3)
-            y = 0.5 * ((2*p1[1]) +
-                       (-p0[1] + p2[1]) * t +
-                       (2*p0[1] - 5*p1[1] + 4*p2[1] - p3[1]) * t2 +
-                       (-p0[1] + 3*p1[1] - 3*p2[1] + p3[1]) * t3)
-            pts.append((x, y))
-    pts.append(points[-1])
-    return pts
+
+def _lerp(a, b, t):
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
 
 
 class Snake:
-    def __init__(self, start_pos, color=(200, 200, 255), speed=4, segment_length=18):
-        self.color = color
-        self.speed = speed
-        self.segment_length = segment_length
+    def __init__(self, grid_cols=40, grid_rows=30, cell=20, start_length=3, speed=8):
+        self.grid_cols = grid_cols
+        self.grid_rows = grid_rows
+        self.cell = cell
+        self.speed = speed  # cells per second
+        self.max_steps_per_frame = 4
 
-        self.body_points = [start_pos]
-        # total length in pixels the snake should occupy
-        self.target_length = segment_length * 5
-        self.head_pos = list(start_pos)
+        cx, cy = grid_cols // 2, grid_rows // 2
+        self.cells = [(cx - i, cy) for i in range(start_length)]
+        self._prev_cells = self.cells[:]
         self.direction = (1, 0)
+        self.next_direction = (1, 0)
+        self._grow_pending = 0
+        self._acc = 0.0
         self.alive = True
+        self._visited = [self.cells[0]]
 
-        self.radius = 3   # constant thickness → slender snake
+        self._glow = None
+
+    @property
+    def head_cell(self):
+        return self.cells[0]
+
+    @property
+    def progress(self):
+        """0..1 interpolation progress toward the current cell (for smooth rendering)."""
+        return min(1.0, self._acc * self.speed)
 
     def set_direction(self, dvec):
-        self.direction = dvec
+        if (dvec[0], dvec[1]) != (-self.direction[0], -self.direction[1]):
+            self.next_direction = dvec
 
-    def grow(self, pixels):
-        # ONLY increases length — not width
-        self.target_length += pixels
+    def grow(self, cells):
+        self._grow_pending += cells
+
+    def eats(self, food_cell):
+        return self.cells[0] == food_cell
+
+    def on_cell(self, cell):
+        return cell in self.cells
+
+    def _step(self):
+        self.direction = self.next_direction
+        hx, hy = self.cells[0]
+        nx, ny = hx + self.direction[0], hy + self.direction[1]
+
+        if nx < 0 or nx >= self.grid_cols or ny < 0 or ny >= self.grid_rows:
+            self.alive = False
+            return
+
+        head = (nx, ny)
+        body = self.cells if self._grow_pending > 0 else self.cells[:-1]
+        if head in body:
+            self.alive = False
+            return
+
+        self.cells.insert(0, head)
+        if self._grow_pending > 0:
+            self._grow_pending -= 1
+        else:
+            self.cells.pop()
 
     def update(self, dt=1.0):
         if not self.alive:
             return
-
-        dx = self.direction[0] * self.speed * dt
-        dy = self.direction[1] * self.speed * dt
-        self.head_pos[0] += dx
-        self.head_pos[1] += dy
-
-        # insert new head point
-        self.body_points.insert(0, (self.head_pos[0], self.head_pos[1]))
-
-        # Rebuild the body_points so that the total path length equals target_length.
-        # If the current path is shorter than target_length we keep the entire path (i.e. snake grows).
-        new_points = [self.body_points[0]]
-        accumulated = 0.0
-
-        for i in range(len(self.body_points) - 1):
-            x1, y1 = self.body_points[i]
-            x2, y2 = self.body_points[i + 1]
-            seg = math.hypot(x2 - x1, y2 - y1)
-
-            # if adding whole segment doesn't exceed target, keep p2
-            if accumulated + seg <= self.target_length:
-                new_points.append((x2, y2))
-                accumulated += seg
-            else:
-                # need partial segment to exactly reach target_length
-                remain = self.target_length - accumulated
-                if seg > 0 and remain > 0:
-                    ratio = remain / seg
-                    nx = x1 + (x2 - x1) * ratio
-                    ny = y1 + (y2 - y1) * ratio
-                    new_points.append((nx, ny))
-                # reached target length — stop adding further tail points
+        interval = 1.0 / self.speed
+        self._acc += dt
+        steps = 0
+        self._visited = [self.cells[0]]
+        while self._acc >= interval and steps < self.max_steps_per_frame:
+            self._prev_cells = self.cells[:]
+            self._acc -= interval
+            self._step()
+            if not self.alive:
                 break
+            self._visited.append(self.cells[0])
+            steps += 1
 
-        # If accumulated < target_length and we've appended all original points,
-        # that's fine: snake is still "growing" until it reaches target_length.
-        self.body_points = new_points
+    @property
+    def visited(self):
+        """Grid cells the head occupied during the most recent update."""
+        return self._visited
 
-    def draw(self, surface):
-        if len(self.body_points) < 2:
+    def _cell_pixel(self, cell):
+        return (cell[0] * self.cell + self.cell / 2.0, cell[1] * self.cell + self.cell / 2.0)
+
+    def render_points(self, progress=1.0):
+        """Pixel-space points along the snake path, spaced one cell apart."""
+        head = _lerp(self._cell_pixel(self._prev_cells[0]),
+                     self._cell_pixel(self.cells[0]), progress)
+        path = [head] + [self._cell_pixel(c) for c in self.cells[1:]]
+        if len(path) < 2:
+            return path
+
+        out = [path[0]]
+        acc = 0.0
+        target = float(self.cell)
+        i = 1
+        while i < len(path) and len(out) < len(self.cells):
+            p_prev, p = path[i - 1], path[i]
+            seg = ((p[0] - p_prev[0]) ** 2 + (p[1] - p_prev[1]) ** 2) ** 0.5
+            while seg > 0 and acc + seg >= target:
+                r = (target - acc) / seg
+                out.append((p_prev[0] + (p[0] - p_prev[0]) * r,
+                            p_prev[1] + (p[1] - p_prev[1]) * r))
+                target += self.cell
+            acc += seg
+            i += 1
+        while len(out) < len(self.cells):
+            out.append(out[-1])
+        return out
+
+    def head_pixel(self, progress=1.0):
+        return _lerp(self._cell_pixel(self._prev_cells[0]),
+                     self._cell_pixel(self.cells[0]), progress)
+
+    def _glow_sprite(self, radius):
+        if self._glow is None:
+            size = radius * 2
+            yy, xx = np.mgrid[0:size, 0:size]
+            dist = np.sqrt((xx - radius + 0.5) ** 2 + (yy - radius + 0.5) ** 2)
+            alpha = np.clip((1.0 - dist / radius) * 70, 0, 70).astype(np.uint8)
+            glow = np.zeros((size, size, 4), dtype=np.uint8)
+            glow[..., 0] = 60
+            glow[..., 1] = 190
+            glow[..., 2] = 90
+            glow[..., 3] = alpha
+            surf = pygame.image.frombuffer(glow, (size, size), "RGBA")
+            try:
+                surf = surf.convert_alpha()
+            except pygame.error:
+                pass
+            self._glow = surf
+        return self._glow
+
+    def draw(self, surface, progress=1.0):
+        if len(self.cells) < 1:
             return
+        radius = int(self.cell * 0.42)
+        glow = self._glow_sprite(radius * 3)
+        gw2, gh2 = glow.get_width() // 2, glow.get_height() // 2
 
-        smooth = catmull_rom_chain(self.body_points, count=10)
+        pts = self.render_points(progress)
+        for x, y in pts[1:]:
+            surface.blit(glow, (x - gw2, y - gh2))
+            pygame.draw.circle(surface, (60, 190, 90), (int(x), int(y)), radius)
 
-        # --- CONSTANT WIDTH SNAKE (slender) ---
-        radius = self.radius
-        glow_radius = int(radius * 2.3)
+        hx, hy = self.head_pixel(progress)
+        hx, hy = int(hx), int(hy)
+        surface.blit(glow, (hx - gw2, hy - gh2))
+        pygame.draw.circle(surface, (110, 230, 120), (hx, hy), radius + 3)
 
-        for i, (x, y) in enumerate(smooth):
-            # glowing outer layer
-            glow_surface = pygame.Surface((glow_radius*2, glow_radius*2), pygame.SRCALPHA)
-            pygame.draw.circle(glow_surface, (200, 200, 255, 45), (glow_radius, glow_radius), glow_radius)
-            surface.blit(glow_surface, (x - glow_radius, y - glow_radius))
-
-            
-            body_color = (230, 230, 255)
-            pygame.draw.circle(surface, body_color, (int(x), int(y)), radius)
-
-    def head_rect(self, size=12):
-        x, y = self.body_points[0]
-        return pygame.Rect(int(x - size/2), int(y - size/2), size, size)
-
-    def collides_with_point(self, point, radius=10):
-        px, py = point
-        hx, hy = self.body_points[0]
-        return (hx - px)**2 + (hy - py)**2 <= radius*radius
-
-    def collides_self(self):
-        # require a minimum number of points before self-collision checking
-        if len(self.body_points) < 8:
-            return False
-
-        hx, hy = self.body_points[0]
-        # start checking a bit into the body to avoid immediate neighbor collisions (false positives)
-        # use a distance threshold based on radius (a little buffer)
-        thresh = (self.radius * 1.8) ** 2
-        for p in self.body_points[8:]:
-            if (hx - p[0])**2 + (hy - p[1])**2 < thresh:
-                return True
-        return False
+        dx, dy = self.direction
+        if dx == 0 and dy == 0:
+            dx = 1
+        perp = (-dy, dx)
+        eye_r = max(2, radius // 2)
+        for side in (-1, 1):
+            ex = hx + perp[0] * side * radius * 0.55 + dx * radius * 0.35
+            ey = hy + perp[1] * side * radius * 0.55 + dy * radius * 0.35
+            pygame.draw.circle(surface, (255, 255, 255), (int(ex), int(ey)), eye_r)
+            px = ex + dx * eye_r * 0.5
+            py = ey + dy * eye_r * 0.5
+            pygame.draw.circle(surface, (20, 40, 25), (int(px), int(py)), max(1, eye_r - 1))

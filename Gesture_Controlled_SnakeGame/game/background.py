@@ -1,23 +1,28 @@
-
-import pygame
 import os
 
-class Background:
-    def __init__(self, surface, image_path="Gesture_Controlled_SnakeGame/Assets/Disco_background1.jpg"):
-        self.surface = surface
-        
-        # Load and scale background image
-        if not os.path.exists(image_path):
-            print(f"[Warning] Background image not found: {image_path}")
-            self.bg = None
-        else:
-            img = pygame.image.load(image_path).convert()
-            w, h = surface.get_size()
-            self.bg = pygame.transform.scale(img, (w, h))
+import pygame
 
-    def draw(self):
-        if self.bg:
-            self.surface.blit(self.bg, (0, 0))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+class Background:
+    def __init__(self, image_path=None):
+        self.image_path = image_path or os.path.join(PROJECT_ROOT, "Assets", "Disco_background1.jpg")
+        self.bg = None
+        self._size = None
+
+    def draw(self, surface):
+        size = surface.get_size()
+        if self.bg is None or self._size != size:
+            self._size = size
+            self.bg = None
+            if os.path.exists(self.image_path):
+                try:
+                    img = pygame.image.load(self.image_path).convert()
+                    self.bg = pygame.transform.smoothscale(img, size)
+                except Exception:
+                    self.bg = None
+        if self.bg is not None:
+            surface.blit(self.bg, (0, 0))
         else:
-            # fallback: plain dark background
-            self.surface.fill((20, 20, 20))
+            surface.fill((20, 20, 20))

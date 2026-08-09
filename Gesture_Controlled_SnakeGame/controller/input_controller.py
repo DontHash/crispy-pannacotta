@@ -31,6 +31,12 @@ class InputController:
         if len(self._pending) == 0 or self._pending[-1] != direction:
             self._pending.append(direction)
 
+    def submit_priority(self, direction):
+        """Newest-intent-wins: flush the pending queue, then queue this direction."""
+        if direction in DIR_VECTORS:
+            self._pending.clear()
+            self._pending.append(direction)
+
     def update(self):
         """Try to apply next pending direction; return currently active direction."""
         if self._pending:

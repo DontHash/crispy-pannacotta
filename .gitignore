@@ -100,3 +100,5 @@ poetry.lock
 
 # Allow a local override file (not committed)
 !.gitignore.local
+# Gesture Snake runtime data
+Gesture_Controlled_SnakeGame/highscore.json
